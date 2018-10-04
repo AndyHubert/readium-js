@@ -12,7 +12,7 @@
 #
 # ALTERNATIVE METHOD (if package.json is corrupted):
 # npm install cson
-# node ./readium-shared-js/readium-cfi-js/node_modules/cson/bin/cson2json package.cson > package.json
+# node ./readium-shared-js/node_modules/cson/bin/cson2json package.cson > package.json
 # Note that on some Windows terminals (e.g. GitShell),
 # unfortunately the package.json file might need its encoding
 # converted to UTF-no-BOM :(
@@ -33,11 +33,12 @@
 
 name: "readium-js"
 
-version: "0.24.0"
+version: "0.31.1"
 
 engines:
-    node: ">=0.12"
-    npm: ">2.10"
+    node: ">=4"
+    npm: ">=2"
+    yarn: ">=0.23"
 
 description: "Readium - core javascript module"
 
@@ -90,37 +91,41 @@ files: [
 #####################################################################
 dependencies:
 
-    "parallelshell": 'latest'
+    #"parallelshell": 'latest'
+    "concurrently": '^3.6.0'
 
-    "opener": 'latest'
+    "npm-run-all": '^4.1.3'
+
+    "opener": '^1.4.3'
 
     #"http-server": 'latest'
-    "http-server": 'danielweck/http-server'
+    "http-server": 'github:danielweck/http-server#master'
     # SEE: https://github.com/indexzero/http-server/issues/154
 
+    "bowser": '^1.9.3'
 
 #####################################################################
 # These dependencies can be fetched by using the "--dev" option
 # in "npm install --dev readium-js".
 devDependencies:
 
-    "crypto-js": 'latest'
+    "crypto-js": '^3.1.9-1'
 
-#    "zipjs": 'gildas-lormeau/zip.js'
-#    "zipjs": 'ryanackley/zip.js'
-    "zipjs": "danielweck/zip.js"
+#    "zipjs": 'github:gildas-lormeau/zip.js'
+#    "zipjs": 'github:ryanackley/zip.js'
+    "zip-js": 'github:danielweck/zip.js#master'
 
 # see readium-cfi-js:
 # "requirejs", "almond", "jquery"
 
 
-    "requirejs-text": 'latest'
+    "requirejs-text": '^2.0.15'
 
 # Below dependencies are only used for building tasks (above are runtime deps):
 
     # see readium-build-tools (in readium-cfi-js)
     # versionsMaker.js
-    "gift": 'latest'
+    "gift": '^0.10.1'
 
 # see readium-cfi-js:
 # "cson", "jshint", "glob", "rimraf", "mkdirp", "watch", "live-reload"
@@ -133,13 +138,13 @@ scripts:
 #=====================
     cson2json: '
 
-        node ./readium-shared-js/readium-cfi-js/node_modules/cson/bin/cson2json package.cson > package.json
+        node ./readium-shared-js/node_modules/cson/bin/cson2json package.cson > package.json
         &&
-        node readium-shared-js/readium-cfi-js/readium-build-tools/optimizePackageJsonScripts.js
+        node readium-shared-js/readium-build-tools/optimizePackageJsonScripts.js
     '
 
 #=====================
-    'prepare': '
+    'prepare:all': '
 
         npm run
             prepare:submodule
@@ -151,13 +156,37 @@ scripts:
 #=====================
     'prepare:local': '
 
-        npm outdated
+        (npm outdated || echo outdated)
         &&
-        npm install
+        (npm ci || npm install)
         &&
-        npm update
+        npm run prepare:local:common
+    '
+
+#=====================
+    'prepare:yarn:all': '
+
+        yarn run
+            prepare:yarn:submodule
         &&
-        node readium-shared-js/readium-cfi-js/readium-build-tools/gitHubForksUpdater.js
+        yarn run
+            prepare:yarn:local
+    '
+
+#=====================
+    'prepare:yarn:local': '
+
+        (yarn outdated || echo outdated)
+        &&
+        yarn install
+        &&
+        yarn run prepare:local:common
+    '
+
+#=====================
+    'prepare:local:common': '
+
+        node readium-shared-js/readium-build-tools/gitHubForksUpdater.js
     '
 
 #=====================
@@ -165,7 +194,19 @@ scripts:
 
         cd readium-shared-js
         &&
-        npm run prepare
+        npm run prepare:all
+        &&
+        cd ..
+        &&
+        ls
+    '
+
+#=====================
+    'prepare:yarn:submodule': '
+
+        cd readium-shared-js
+        &&
+        yarn run prepare:yarn:all
         &&
         cd ..
         &&
@@ -175,6 +216,8 @@ scripts:
 #=====================
     clean: '
 
+        (yarn --version || echo noyarn)
+        &&
         node --version
         &&
         npm --version
@@ -219,7 +262,7 @@ scripts:
     'genPluginsConfig': '
         cd readium-shared-js/
         &&
-        node readium-cfi-js/readium-build-tools/pluginsConfigMaker.js
+        node readium-build-tools/pluginsConfigMaker.js
         &&
         cd ..
     '
@@ -386,11 +429,11 @@ scripts:
 
         echo > open_webbrowser.js
         &&
-        parallelshell
-            \"npm run dowatch\"
-            \"npm run httpServe\"
+        run-p
+            \"dowatch\"
+            \"httpServe\"
     '
-#    \"npm run live-reload\"
+#    \"live-reload\"
 
 #=====================
 #### BLOCKING! (CTRL-C) [http]
@@ -406,10 +449,10 @@ scripts:
 
         npm run watch
             \"npm run build
-                && node readium-shared-js/readium-cfi-js/readium-build-tools/webbrowser.js
+                && node readium-shared-js/readium-build-tools/webbrowser.js
                 && npm run rimraf
                     open_webbrowser.js\"
-            dev/ js/ readium-shared-js/js/ readium-shared-js/plugins/ readium-shared-js/readium-cfi-js/js/
+            dev/ js/ readium-shared-js/js/ readium-shared-js/plugins/ readium-shared-js/js/
     '
     #    nodemon -q
     #    -w dev/
@@ -420,7 +463,7 @@ scripts:
     'httpServe': '
 
         node
-            readium-shared-js/readium-cfi-js/readium-build-tools/http-server.js
+            readium-shared-js/readium-build-tools/http-server.js
             
             -LOGFILE
             http.log
@@ -428,6 +471,7 @@ scripts:
             -OPEN
             /dev/
             
+            -c-1
             -a 127.0.0.1
             -p 9090
             --cors
